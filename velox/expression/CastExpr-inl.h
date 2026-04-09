@@ -188,7 +188,21 @@ void CastExpr::applyCastKernel(
       }
       if constexpr (ToKind == TypeKind::TIMESTAMP) {
         const auto castResult = hooks_->castStringToTimestamp(inputRowValue);
-        setResultOrError(castResult, row);
+        if (castResult.hasError()) {
+          if (setNullInResultAtError()) {
+            result->setNull(row, true);
+          } else {
+            context.setVeloxExceptionError(
+                row,
+                makeBadCastException(
+                    result->type(),
+                    *input,
+                    row,
+                    castResult.error().message()));
+          }
+        } else {
+          result->set(row, castResult.value());
+        }
         return;
       }
       if constexpr (ToKind == TypeKind::REAL) {
